@@ -4,7 +4,7 @@ trigger:
 pr: none
 
 pool:
-  vmImage: self-hosted-pool
+  name: self-hosted-pool
 
 variables:
   azureServiceConnection: 'sc-obs-azure-rg'
