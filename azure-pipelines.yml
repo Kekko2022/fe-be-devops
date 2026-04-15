@@ -52,7 +52,7 @@ stages:
       displayName: Build and push backend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
