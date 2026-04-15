@@ -60,77 +60,68 @@ stages:
   condition: succeeded()
   jobs:
 
-  # -------------------------
+  # =========================
   # BACKEND
-  # -------------------------
+  # =========================
   - job: BuildBackend
     displayName: Build and push backend image
     steps:
     - checkout: self
 
-    - task: AzureCLI@2
-      displayName: Build and push backend image to ACR
-      inputs:
-        azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
+    - bash: |
+        set -e
 
-          echo "Login Azure..."
-          az account show
+        echo "Login Azure..."
+        az account show
 
-          echo "Login ACR..."
-          az acr login --name $(acrName)
+        echo "Login ACR..."
+        az acr login --name $(acrName)
 
-          BACKEND_IMAGE="$(acrName).azurecr.io/backend:$(imageTag)"
+        BACKEND_IMAGE="$(acrName).azurecr.io/backend:$(imageTag)"
 
-          echo "Building backend image: $BACKEND_IMAGE"
-          docker build -t $BACKEND_IMAGE ./backend
+        echo "Building backend image: $BACKEND_IMAGE"
+        docker build -t $BACKEND_IMAGE ./backend
 
-          echo "Pushing backend image..."
-          docker push $BACKEND_IMAGE
+        echo "Pushing backend image..."
+        docker push $BACKEND_IMAGE
 
-          echo "Tags backend repository:"
-          az acr repository show-tags \
-            --name $(acrName) \
-            --repository backend \
-            -o table
+        echo "Tags backend repository:"
+        az acr repository show-tags \
+          --name $(acrName) \
+          --repository backend \
+          -o table
+      displayName: Build and push backend image
 
 
-  # -------------------------
+  # =========================
   # FRONTEND
-  # -------------------------
+  # =========================
   - job: BuildFrontend
     displayName: Build and push frontend image
+    dependsOn: BuildBackend   # 👈 FIX PARALLELISM
     steps:
     - checkout: self
 
-    - task: AzureCLI@2
-      displayName: Build and push frontend image to ACR
-      inputs:
-        azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
+    - bash: |
+        set -e
 
-          echo "Login Azure..."
-          az account show
+        echo "Login Azure..."
+        az account show
 
-          echo "Login ACR..."
-          az acr login --name $(acrName)
+        echo "Login ACR..."
+        az acr login --name $(acrName)
 
-          FRONTEND_IMAGE="$(acrName).azurecr.io/frontend:$(imageTag)"
+        FRONTEND_IMAGE="$(acrName).azurecr.io/frontend:$(imageTag)"
 
-          echo "Building frontend image: $FRONTEND_IMAGE"
-          docker build -t $FRONTEND_IMAGE ./frontend
+        echo "Building frontend image: $FRONTEND_IMAGE"
+        docker build -t $FRONTEND_IMAGE ./frontend
 
-          echo "Pushing frontend image..."
-          docker push $FRONTEND_IMAGE
+        echo "Pushing frontend image..."
+        docker push $FRONTEND_IMAGE
 
-          echo "Tags frontend repository:"
-          az acr repository show-tags \
-            --name $(acrName) \
-            --repository frontend \
-            -o table
+        echo "Tags frontend repository:"
+        az acr repository show-tags \
+          --name $(acrName) \
+          --repository frontend \
+          -o table
+      displayName: Build and push frontend image
