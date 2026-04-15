@@ -12,6 +12,10 @@ variables:
   imageTag: '$(Build.BuildId)'
 
 stages:
+
+# =========================
+# VALIDATION STAGE
+# =========================
 - stage: ValidateRepository
   displayName: Validate monorepo structure
   jobs:
@@ -24,25 +28,41 @@ stages:
         set -e
 
         echo "Verifica struttura repository"
-        test -f frontend/app.py
-        test -f frontend/requirements.txt
-        test -f frontend/Dockerfile
-        test -f backend/app.py
-        test -f backend/requirements.txt
-        test -f backend/Dockerfile
+
+        for f in \
+          frontend/app.py \
+          frontend/requirements.txt \
+          frontend/Dockerfile \
+          backend/app.py \
+          backend/requirements.txt \
+          backend/Dockerfile
+        do
+          if [ ! -f "$f" ]; then
+            echo "File mancante: $f"
+            exit 1
+          fi
+        done
 
         echo "Verifica sintassi Python"
         python3 -m py_compile frontend/app.py
         python3 -m py_compile backend/app.py
 
-        echo "Verifica completata"
+        echo "OK: validazione completata"
       displayName: Validate files and Python syntax
 
+
+# =========================
+# BUILD & PUSH STAGE
+# =========================
 - stage: PublishImages
   displayName: Build and push FE/BE images
   dependsOn: ValidateRepository
   condition: succeeded()
   jobs:
+
+  # -------------------------
+  # BACKEND
+  # -------------------------
   - job: BuildBackend
     displayName: Build and push backend image
     steps:
@@ -52,27 +72,35 @@ stages:
       displayName: Build and push backend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'ps'
+        scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
 
+          echo "Login Azure..."
           az account show
+
+          echo "Login ACR..."
           az acr login --name $(acrName)
 
           BACKEND_IMAGE="$(acrName).azurecr.io/backend:$(imageTag)"
 
-          echo "Build backend image: ${BACKEND_IMAGE}"
-          docker build -t ${BACKEND_IMAGE} ./backend
+          echo "Building backend image: $BACKEND_IMAGE"
+          docker build -t $BACKEND_IMAGE ./backend
 
-          echo "Push backend image: ${BACKEND_IMAGE}"
-          docker push ${BACKEND_IMAGE}
+          echo "Pushing backend image..."
+          docker push $BACKEND_IMAGE
 
+          echo "Tags backend repository:"
           az acr repository show-tags \
             --name $(acrName) \
             --repository backend \
             -o table
 
+
+  # -------------------------
+  # FRONTEND
+  # -------------------------
   - job: BuildFrontend
     displayName: Build and push frontend image
     steps:
@@ -87,17 +115,21 @@ stages:
         inlineScript: |
           set -e
 
+          echo "Login Azure..."
           az account show
+
+          echo "Login ACR..."
           az acr login --name $(acrName)
 
           FRONTEND_IMAGE="$(acrName).azurecr.io/frontend:$(imageTag)"
 
-          echo "Build frontend image: ${FRONTEND_IMAGE}"
-          docker build -t ${FRONTEND_IMAGE} ./frontend
+          echo "Building frontend image: $FRONTEND_IMAGE"
+          docker build -t $FRONTEND_IMAGE ./frontend
 
-          echo "Push frontend image: ${FRONTEND_IMAGE}"
-          docker push ${FRONTEND_IMAGE}
+          echo "Pushing frontend image..."
+          docker push $FRONTEND_IMAGE
 
+          echo "Tags frontend repository:"
           az acr repository show-tags \
             --name $(acrName) \
             --repository frontend \
