@@ -102,20 +102,26 @@ stages:
         scriptLocation: inlineScript
         inlineScript: |
 
-          az extension add --name containerapp --upgrade
+          az extension add --name containerapp --upgrade --yes
 
           $BACKEND_IMAGE = "$(acrName).azurecr.io/$(backendImageName):$(imageTag)"
 
           Write-Host "Checking backend existence..."
 
-          $result = az containerapp show `
-            --name $(backendAppName) `
-            --resource-group $(resourceGroupName) `
-            --only-show-errors `
-            -o none 2>$null
+          $backend = $null
+          try {
+              $backend = az containerapp show `
+                --name $(backendAppName) `
+                --resource-group $(resourceGroupName) `
+                --only-show-errors `
+                -o json | ConvertFrom-Json
+          } catch {
+              $backend = $null
+          }
 
-          if ($LASTEXITCODE -eq 0) {
+          if ($backend -and $backend.name) {
             Write-Host "Backend exists → update"
+
             az containerapp update `
               --name $(backendAppName) `
               --resource-group $(resourceGroupName) `
@@ -123,6 +129,7 @@ stages:
           }
           else {
             Write-Host "Backend does NOT exist → create"
+
             az containerapp create `
               --name $(backendAppName) `
               --resource-group $(resourceGroupName) `
@@ -158,7 +165,7 @@ stages:
         scriptLocation: inlineScript
         inlineScript: |
 
-          az extension add --name containerapp --upgrade
+          az extension add --name containerapp --upgrade --yes
 
           $FRONTEND_IMAGE = "$(acrName).azurecr.io/$(frontendImageName):$(imageTag)"
 
@@ -170,14 +177,22 @@ stages:
 
           $BACKEND_URL = "https://$BE_FQDN"
 
-          $exists = az containerapp show `
-            --name $(frontendAppName) `
-            --resource-group $(resourceGroupName) `
-            --only-show-errors `
-            -o none 2>$null
+          Write-Host "Checking frontend existence..."
 
-          if ($LASTEXITCODE -eq 0) {
+          $frontend = $null
+          try {
+              $frontend = az containerapp show `
+                --name $(frontendAppName) `
+                --resource-group $(resourceGroupName) `
+                --only-show-errors `
+                -o json | ConvertFrom-Json
+          } catch {
+              $frontend = $null
+          }
+
+          if ($frontend -and $frontend.name) {
             Write-Host "Frontend exists → update"
+
             az containerapp update `
               --name $(frontendAppName) `
               --resource-group $(resourceGroupName) `
@@ -186,6 +201,7 @@ stages:
           }
           else {
             Write-Host "Frontend does NOT exist → create"
+
             az containerapp create `
               --name $(frontendAppName) `
               --resource-group $(resourceGroupName) `
@@ -222,7 +238,7 @@ stages:
         scriptLocation: inlineScript
         inlineScript: |
 
-          az extension add --name containerapp --upgrade
+          az extension add --name containerapp --upgrade --yes
 
           $FE_FQDN = az containerapp show `
             --name $(frontendAppName) `
@@ -239,13 +255,13 @@ stages:
           Start-Sleep -Seconds 40
 
           Write-Host "Backend health"
-          curl.exe --fail "https://$BE_FQDN/health"
+          Invoke-WebRequest "https://$BE_FQDN/health" -UseBasicParsing
 
           Write-Host "Frontend health"
-          curl.exe --fail "https://$FE_FQDN/health"
+          Invoke-WebRequest "https://$FE_FQDN/health" -UseBasicParsing
 
           Write-Host "Frontend demo"
-          curl.exe --fail "https://$FE_FQDN/demo"
+          Invoke-WebRequest "https://$FE_FQDN/demo" -UseBasicParsing
 
           az containerapp revision list `
             --name $(backendAppName) `
