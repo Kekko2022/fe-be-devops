@@ -240,13 +240,13 @@ stages:
             --name $(frontendAppName) \
             --resource-group $(resourceGroupName) \
             --query properties.configuration.ingress.fqdn \
-            -o tsv)
+            -o tsv | tr -d '\r\n')
 
           BE_FQDN=$(az containerapp show \
             --name $(backendAppName) \
             --resource-group $(resourceGroupName) \
             --query properties.configuration.ingress.fqdn \
-            -o tsv)
+            -o tsv | tr -d '\r\n')
 
           echo "Attendo 20 secondi per warm-up"
           sleep 20
