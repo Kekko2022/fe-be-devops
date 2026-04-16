@@ -185,7 +185,7 @@ stages:
             --query properties.configuration.ingress.fqdn \
             -o tsv)
 
-          BACKEND_URL="https://${BE_FQDN}"
+          BACKEND_URL=$(echo "https://${BE_FQDN}" | tr -d '\r\n')
 
           if az containerapp show --name $(frontendAppName) --resource-group $(resourceGroupName) >/dev/null 2>&1; then
             echo "Frontend app esiste già: aggiorno immagine e BACKEND_URL"
