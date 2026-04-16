@@ -80,10 +80,17 @@ stages:
         BACKEND_IMAGE="$(acrName).azurecr.io/backend:$(imageTag)"
 
         echo "Building backend image: $BACKEND_IMAGE"
-        docker build -t $BACKEND_IMAGE ./backend
+        docker build \
+          --platform linux/amd64 \
+          -t $BACKEND_IMAGE \
+          ./backend
 
         echo "Pushing backend image..."
         docker push $BACKEND_IMAGE
+
+        # Tag latest (opzionale ma consigliato)
+        docker tag $BACKEND_IMAGE $(acrName).azurecr.io/backend:latest
+        docker push $(acrName).azurecr.io/backend:latest
 
         echo "Tags backend repository:"
         az acr repository show-tags \
@@ -98,7 +105,7 @@ stages:
   # =========================
   - job: BuildFrontend
     displayName: Build and push frontend image
-    dependsOn: BuildBackend   # 👈 FIX PARALLELISM
+    dependsOn: BuildBackend
     steps:
     - checkout: self
 
@@ -114,10 +121,17 @@ stages:
         FRONTEND_IMAGE="$(acrName).azurecr.io/frontend:$(imageTag)"
 
         echo "Building frontend image: $FRONTEND_IMAGE"
-        docker build -t $FRONTEND_IMAGE ./frontend
+        docker build \
+          --platform linux/amd64 \
+          -t $FRONTEND_IMAGE \
+          ./frontend
 
         echo "Pushing frontend image..."
         docker push $FRONTEND_IMAGE
+
+        # Tag latest (opzionale ma consigliato)
+        docker tag $FRONTEND_IMAGE $(acrName).azurecr.io/frontend:latest
+        docker push $(acrName).azurecr.io/frontend:latest
 
         echo "Tags frontend repository:"
         az acr repository show-tags \
