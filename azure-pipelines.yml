@@ -20,11 +20,11 @@ variables:
 
   imageTag: '$(Build.BuildId)'
 
+stages:
+
 # =========================
 # VALIDATION
 # =========================
-stages:
-
 - stage: ValidateRepository
   jobs:
   - job: ValidateFiles
@@ -43,7 +43,6 @@ stages:
 # =========================
 - stage: PublishImages
   dependsOn: ValidateRepository
-  condition: succeeded()
   jobs:
 
   - job: BuildBackend
@@ -103,13 +102,24 @@ stages:
         inlineScript: |
 
           az extension add --name containerapp --upgrade --yes
+          az config set extension.use_dynamic_install=yes_without_prompt
 
           $IMAGE = "$(acrName).azurecr.io/$(backendImageName):$(imageTag)"
 
-          $exists = az containerapp show `
+          Write-Host "Checking backend existence..."
+          $exists = $false
+
+          az containerapp show `
             -n $(backendAppName) `
             -g $(resourceGroupName) `
-            -o json 2>$null | ConvertFrom-Json
+            --only-show-errors `
+            -o json 2>$null | Out-Null
+
+          if ($LASTEXITCODE -eq 0) {
+            $exists = $true
+          }
+
+          Write-Host "Backend exists: $exists"
 
           if ($exists) {
             Write-Host "Updating backend..."
@@ -157,6 +167,7 @@ stages:
         inlineScript: |
 
           az extension add --name containerapp --upgrade --yes
+          az config set extension.use_dynamic_install=yes_without_prompt
 
           $IMAGE = "$(acrName).azurecr.io/$(frontendImageName):$(imageTag)"
 
@@ -168,10 +179,22 @@ stages:
 
           $BACKEND_URL = "https://$BE_FQDN"
 
-          $exists = az containerapp show `
+          Write-Host "Backend URL: $BACKEND_URL"
+
+          Write-Host "Checking frontend existence..."
+          $exists = $false
+
+          az containerapp show `
             -n $(frontendAppName) `
             -g $(resourceGroupName) `
-            -o json 2>$null | ConvertFrom-Json
+            --only-show-errors `
+            -o json 2>$null | Out-Null
+
+          if ($LASTEXITCODE -eq 0) {
+            $exists = $true
+          }
+
+          Write-Host "Frontend exists: $exists"
 
           if ($exists) {
             Write-Host "Updating frontend..."
@@ -197,10 +220,8 @@ stages:
               --env-vars BACKEND_URL=$BACKEND_URL
           }
 
-          Write-Host "Frontend URL ready"
-
 # =========================
-# VERIFY (ROBUST VERSION)
+# VERIFY (ROBUST)
 # =========================
 - stage: VerifyDeployment
   dependsOn: DeployFrontend
@@ -231,30 +252,25 @@ stages:
           $BE_URL = "https://$BE_FQDN"
           $FE_URL = "https://$FE_FQDN"
 
-          Write-Host "Waiting for services to stabilize..."
-          Start-Sleep -Seconds 90
+          Write-Host "Backend: $BE_URL"
+          Write-Host "Frontend: $FE_URL"
 
           function Test-Url($url) {
-              for ($i=0; $i -lt 6; $i++) {
+              for ($i=0; $i -lt 12; $i++) {
                   try {
-                      $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 20
+                      Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 15
                       Write-Host "OK: $url"
                       return
                   } catch {
-                      Write-Host "Retry $i failed: $url"
+                      Write-Host "Waiting ($i): $url"
                       Start-Sleep -Seconds 10
                   }
               }
               throw "Service not reachable: $url"
           }
 
-          Write-Host "Testing backend..."
           Test-Url "$BE_URL/health"
-
-          Write-Host "Testing frontend health..."
           Test-Url "$FE_URL/health"
-
-          Write-Host "Testing frontend demo..."
           Test-Url "$FE_URL/demo"
 
           Write-Host "Revisions backend:"
