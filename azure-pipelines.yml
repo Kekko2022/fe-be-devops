@@ -80,9 +80,11 @@ stages:
         BACKEND_IMAGE="$(acrName).azurecr.io/backend:$(imageTag)"
 
         echo "Building backend image: $BACKEND_IMAGE"
-        docker build \
+        docker buildx build \
           --platform linux/amd64 \
-          -t $BACKEND_IMAGE \
+          --provenance=false \
+          -t ${BACKEND_IMAGE} \
+          --push \
           ./backend
 
         echo "Pushing backend image..."
@@ -121,9 +123,11 @@ stages:
         FRONTEND_IMAGE="$(acrName).azurecr.io/frontend:$(imageTag)"
 
         echo "Building frontend image: $FRONTEND_IMAGE"
-        docker build \
+        docker buildx build \
           --platform linux/amd64 \
-          -t $FRONTEND_IMAGE \
+          --provenance=false \
+          -t ${FRONTEND_IMAGE} \
+          --push \
           ./frontend
 
         echo "Pushing frontend image..."
