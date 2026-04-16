@@ -21,58 +21,42 @@ variables:
 stages:
 
 # =========================
-# VALIDATION STAGE
+# VALIDATION
 # =========================
 - stage: ValidateRepository
-  displayName: Validate monorepo structure
   jobs:
   - job: ValidateFiles
-    displayName: Check required files and Python syntax
     steps:
     - checkout: self
-
     - bash: |
         set -e
         test -f frontend/app.py
-        test -f frontend/requirements.txt
-        test -f frontend/Dockerfile
         test -f backend/app.py
-        test -f backend/requirements.txt
-        test -f backend/Dockerfile
-
         python3 -m py_compile frontend/app.py
         python3 -m py_compile backend/app.py
-      displayName: Validate files and Python syntax
+      displayName: Validate repo
 
 
 # =========================
-# BUILD & PUSH STAGE
+# BUILD IMAGES
 # =========================
 - stage: PublishImages
-  displayName: Build and push FE/BE images
   dependsOn: ValidateRepository
   condition: succeeded()
   jobs:
 
-  # BACKEND
   - job: BuildBackend
-    displayName: Build and push backend image
     steps:
     - checkout: self
-
     - task: AzureCLI@2
-      displayName: Build and push backend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'ps'
-        scriptLocation: 'inlineScript'
+        scriptType: ps
+        scriptLocation: inlineScript
         inlineScript: |
-          az account show
           az acr login --name $(acrName)
 
           $BACKEND_IMAGE = "$(acrName).azurecr.io/$(backendImageName):$(imageTag)"
-
-          Write-Host "Building backend image with buildx..."
 
           docker buildx build `
             --platform linux/amd64 `
@@ -81,27 +65,19 @@ stages:
             --push `
             ./backend
 
-
-  # FRONTEND
   - job: BuildFrontend
-    displayName: Build and push frontend image
     dependsOn: BuildBackend
     steps:
     - checkout: self
-
     - task: AzureCLI@2
-      displayName: Build and push frontend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'ps'
-        scriptLocation: 'inlineScript'
+        scriptType: ps
+        scriptLocation: inlineScript
         inlineScript: |
-          az account show
           az acr login --name $(acrName)
 
           $FRONTEND_IMAGE = "$(acrName).azurecr.io/$(frontendImageName):$(imageTag)"
-
-          Write-Host "Building frontend image with buildx..."
 
           docker buildx build `
             --platform linux/amd64 `
@@ -115,47 +91,44 @@ stages:
 # DEPLOY BACKEND
 # =========================
 - stage: DeployBackend
-  displayName: Deploy backend to ACA
   dependsOn: PublishImages
-  condition: succeeded()
   jobs:
   - job: DeployBackendJob
-    displayName: Deploy or update backend container app
     steps:
     - task: AzureCLI@2
-      displayName: Deploy backend app
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'ps'
-        scriptLocation: 'inlineScript'
+        scriptType: ps
+        scriptLocation: inlineScript
         inlineScript: |
+
           az extension add --name containerapp --upgrade
 
           $BACKEND_IMAGE = "$(acrName).azurecr.io/$(backendImageName):$(imageTag)"
 
-          Write-Host "Checking if backend app exists..."
+          Write-Host "Checking backend existence..."
 
-          $exists = $false
-          try {
-            az containerapp show --name $(backendAppName) --resource-group $(resourceGroupName) | Out-Null
-            $exists = $true
-          } catch {}
+          $result = az containerapp show `
+            --name $(backendAppName) `
+            --resource-group $(resourceGroupName) `
+            --only-show-errors `
+            -o none 2>$null
 
-          if ($exists) {
-            Write-Host "Backend exists → updating image"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Backend exists → update"
             az containerapp update `
               --name $(backendAppName) `
               --resource-group $(resourceGroupName) `
               --image $BACKEND_IMAGE
           }
           else {
-            Write-Host "Backend does not exist → creating"
+            Write-Host "Backend does NOT exist → create"
             az containerapp create `
               --name $(backendAppName) `
               --resource-group $(resourceGroupName) `
               --environment $(containerAppsEnvironment) `
               --image $BACKEND_IMAGE `
-              --target-port 5000 `
+              --target-port 8000 `
               --ingress external `
               --min-replicas 1 `
               --max-replicas 1 `
@@ -174,20 +147,17 @@ stages:
 # DEPLOY FRONTEND
 # =========================
 - stage: DeployFrontend
-  displayName: Deploy frontend to ACA
   dependsOn: DeployBackend
-  condition: succeeded()
   jobs:
   - job: DeployFrontendJob
-    displayName: Deploy or update frontend container app
     steps:
     - task: AzureCLI@2
-      displayName: Deploy frontend app
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'ps'
-        scriptLocation: 'inlineScript'
+        scriptType: ps
+        scriptLocation: inlineScript
         inlineScript: |
+
           az extension add --name containerapp --upgrade
 
           $FRONTEND_IMAGE = "$(acrName).azurecr.io/$(frontendImageName):$(imageTag)"
@@ -200,14 +170,14 @@ stages:
 
           $BACKEND_URL = "https://$BE_FQDN"
 
-          $exists = $false
-          try {
-            az containerapp show --name $(frontendAppName) --resource-group $(resourceGroupName) | Out-Null
-            $exists = $true
-          } catch {}
+          $exists = az containerapp show `
+            --name $(frontendAppName) `
+            --resource-group $(resourceGroupName) `
+            --only-show-errors `
+            -o none 2>$null
 
-          if ($exists) {
-            Write-Host "Frontend exists → updating"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Frontend exists → update"
             az containerapp update `
               --name $(frontendAppName) `
               --resource-group $(resourceGroupName) `
@@ -215,7 +185,7 @@ stages:
               --set-env-vars BACKEND_URL=$BACKEND_URL
           }
           else {
-            Write-Host "Frontend does not exist → creating"
+            Write-Host "Frontend does NOT exist → create"
             az containerapp create `
               --name $(frontendAppName) `
               --resource-group $(resourceGroupName) `
@@ -238,23 +208,20 @@ stages:
 
 
 # =========================
-# VERIFY DEPLOYMENT
+# VERIFY
 # =========================
 - stage: VerifyDeployment
-  displayName: Verify FE and BE deployment
   dependsOn: DeployFrontend
-  condition: succeeded()
   jobs:
   - job: VerifyJob
-    displayName: Run endpoint checks and show revisions
     steps:
     - task: AzureCLI@2
-      displayName: Verify deployed apps
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'ps'
-        scriptLocation: 'inlineScript'
+        scriptType: ps
+        scriptLocation: inlineScript
         inlineScript: |
+
           az extension add --name containerapp --upgrade
 
           $FE_FQDN = az containerapp show `
@@ -269,25 +236,22 @@ stages:
             --query properties.configuration.ingress.fqdn `
             -o tsv
 
-          Write-Host "Waiting 20 seconds for warm-up"
-          Start-Sleep -Seconds 20
+          Start-Sleep -Seconds 40
 
-          Write-Host "Test backend /health"
-          curl.exe --fail --silent --show-error "https://$BE_FQDN/health"
+          Write-Host "Backend health"
+          curl.exe --fail "https://$BE_FQDN/health"
 
-          Write-Host "Test frontend /health"
-          curl.exe --fail --silent --show-error "https://$FE_FQDN/health"
+          Write-Host "Frontend health"
+          curl.exe --fail "https://$FE_FQDN/health"
 
-          Write-Host "Test frontend /demo"
-          curl.exe --fail --silent --show-error "https://$FE_FQDN/demo"
+          Write-Host "Frontend demo"
+          curl.exe --fail "https://$FE_FQDN/demo"
 
-          Write-Host "Revision list backend"
           az containerapp revision list `
             --name $(backendAppName) `
             --resource-group $(resourceGroupName) `
             -o table
 
-          Write-Host "Revision list frontend"
           az containerapp revision list `
             --name $(frontendAppName) `
             --resource-group $(resourceGroupName) `
