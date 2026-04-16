@@ -4,7 +4,7 @@ trigger:
 pr: none
 
 pool:
-  name: self-hosted-pool
+  name: self-hosted-pool-linux
 
 variables:
   azureServiceConnection: 'sc-obs-azure-rg'
