@@ -64,7 +64,7 @@ stages:
       displayName: Build and push backend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
@@ -93,7 +93,7 @@ stages:
       displayName: Build and push frontend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
@@ -126,7 +126,7 @@ stages:
       displayName: Deploy backend app
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
@@ -179,7 +179,7 @@ stages:
       displayName: Deploy frontend app
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
@@ -242,7 +242,7 @@ stages:
       displayName: Verify deployed apps
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
