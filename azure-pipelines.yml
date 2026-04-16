@@ -249,26 +249,41 @@ stages:
           $BE_FQDN = az containerapp show `
             --name $(backendAppName) `
             --resource-group $(resourceGroupName) `
-            --query properties.configuration.ingress.fqdn `
-            -o tsv
+            -o tsv `
+            --query properties.configuration.ingress.fqdn
 
-          Start-Sleep -Seconds 40
+          Write-Host "Waiting backend to stabilize..."
 
-          Write-Host "Backend health"
-          Invoke-WebRequest "https://$BE_FQDN/health" -UseBasicParsing
+          $maxRetries = 12
+          $delay = 20
+          $success = $false
+
+          for ($i=0; $i -lt $maxRetries; $i++) {
+
+              try {
+                  Write-Host "Attempt $($i+1) - calling backend health..."
+
+                  $resp = Invoke-WebRequest "https://$BE_FQDN/health" -UseBasicParsing -TimeoutSec 20
+
+                  if ($resp.StatusCode -eq 200) {
+                      Write-Host "Backend OK"
+                      $success = $true
+                      break
+                  }
+              }
+              catch {
+                  Write-Host "Backend not ready yet..."
+              }
+
+              Start-Sleep -Seconds $delay
+          }
+
+          if (-not $success) {
+              throw "Backend health check failed after retries"
+          }
 
           Write-Host "Frontend health"
-          Invoke-WebRequest "https://$FE_FQDN/health" -UseBasicParsing
+          Invoke-WebRequest "https://$FE_FQDN/health" -UseBasicParsing -TimeoutSec 20
 
           Write-Host "Frontend demo"
-          Invoke-WebRequest "https://$FE_FQDN/demo" -UseBasicParsing
-
-          az containerapp revision list `
-            --name $(backendAppName) `
-            --resource-group $(resourceGroupName) `
-            -o table
-
-          az containerapp revision list `
-            --name $(frontendAppName) `
-            --resource-group $(resourceGroupName) `
-            -o table
+          Invoke-WebRequest "https://$FE_FQDN/demo" -UseBasicParsing -TimeoutSec 20
