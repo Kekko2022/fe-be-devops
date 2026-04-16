@@ -64,7 +64,7 @@ stages:
       displayName: Build and push backend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'pscore'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           az account show
@@ -93,7 +93,7 @@ stages:
       displayName: Build and push frontend image to ACR
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'pscore'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           az account show
@@ -126,7 +126,7 @@ stages:
       displayName: Deploy backend app
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'pscore'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           az extension add --name containerapp --upgrade
@@ -185,7 +185,7 @@ stages:
       displayName: Deploy frontend app
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'pscore'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           az extension add --name containerapp --upgrade
@@ -252,7 +252,7 @@ stages:
       displayName: Verify deployed apps
       inputs:
         azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'pscore'
+        scriptType: 'ps'
         scriptLocation: 'inlineScript'
         inlineScript: |
           az extension add --name containerapp --upgrade
