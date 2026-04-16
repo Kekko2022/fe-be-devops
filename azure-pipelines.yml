@@ -8,10 +8,10 @@ pool:
 
 variables:
   azureServiceConnection: 'sc-obs-azure-rg'
-  resourceGroupName: 'rg-observability-dev'
+  resourceGroupName: 'rg-observability-lab12-standalone'
   location: 'westeurope'
   acrName: 'obsacrc830a3'
-  containerAppsEnvironment: 'aca-obs-env'
+  containerAppsEnvironment: 'aca-env-francesco'
   backendAppName: 'be-obs-app'
   frontendAppName: 'fe-obs-app'
   backendImageName: 'backend'
